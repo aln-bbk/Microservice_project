@@ -1,0 +1,48 @@
+
+server:
+  port: 8081
+
+spring:
+  application:
+    name: authentication-service
+
+  datasource:
+    url: ${AUTH_DB_URL:jdbc:postgresql://127.0.0.1:5432/auth_service}
+    username: ${AUTH_DB_USERNAME:postgres}
+    password: ${AUTH_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+app:
+  internal-api:
+    key: ${INTERNAL_API_KEY:}
+
+  bootstrap-admin:
+    enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+    login: ${BOOTSTRAP_ADMIN_LOGIN:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    user-id: ${BOOTSTRAP_ADMIN_USER_ID:}
+
+  jwt:
+    issuer: ${JWT_ISSUER:https://auth.example.com}
+    private-key-location: ${JWT_PRIVATE_KEY_PATH}
+    public-key-location: ${JWT_PUBLIC_KEY_PATH:public.pem}
+    access-token-minutes: 15
+    refresh-token-days: 7

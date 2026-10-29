@@ -1,0 +1,9 @@
+app:
+  internal-api:
+    key: test-internal-api-key
+  jwt:
+    issuer: https://auth.example.com
+    private-key-location: C:/path/to/your/private.pem
+    public-key-location: C:/path/to/your/public.pem
+    access-token-minutes: 15
+    refresh-token-days: 7
