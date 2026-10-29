@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: course_project
+  cache:
+    type: redis
+    redis:
+      time-to-live: 10m
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+
+app:
+  jwt:
+    issuer: ${JWT_ISSUER:https://auth.example.com}
+    public-key-location: ${JWT_PUBLIC_KEY_LOCATION:classpath:keys/public.pem}
+  auth-service:
+    base-url: ${AUTH_SERVICE_BASE_URL:http://localhost:8081}
+  internal-api:
+    key: ${INTERNAL_API_KEY:}
