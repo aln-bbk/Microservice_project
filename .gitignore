@@ -1,0 +1,19 @@
+# Maven
+**/target/
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Local secrets and environment
+.env
+**/.env
+**/private.pem
+**/secrets/
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
