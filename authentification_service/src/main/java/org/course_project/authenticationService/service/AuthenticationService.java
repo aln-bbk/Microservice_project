@@ -100,7 +100,6 @@ public class AuthenticationService {
             new BadCredentialsException("Invalid refresh token")
         );
 
-    // Одноразовое использование refresh-токена.
     storedToken.revoke();
     refreshTokenRepository.save(storedToken);
 

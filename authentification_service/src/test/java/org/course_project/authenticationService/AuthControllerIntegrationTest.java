@@ -208,7 +208,6 @@ class AuthControllerIntegrationTest {
         jwtService.hashToken(newRefresh)
     )).isPresent();
 
-    // Повторное использование старого refresh-токена запрещено.
     mockMvc.perform(post("/api/auth/refresh")
             .contentType(MediaType.APPLICATION_JSON)
             .content(refreshJson(oldRefresh)))
@@ -228,8 +227,7 @@ class AuthControllerIntegrationTest {
         .andExpect(jsonPath("$.tokenType").value("access"))
         .andExpect(jsonPath("$.userId").value(Long.toString(userId)))
         .andExpect(jsonPath("$.role").value("USER"));
-
-    // Refresh-токен не должен приниматься как access-токен.
+    
     mockMvc.perform(post("/api/auth/validate")
             .contentType(MediaType.APPLICATION_JSON)
             .content(tokenJson(tokens.get("refreshToken").asText())))

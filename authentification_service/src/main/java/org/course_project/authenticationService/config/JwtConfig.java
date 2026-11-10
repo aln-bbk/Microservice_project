@@ -64,20 +64,11 @@ public class JwtConfig {
     return new NimbusJwtEncoder(jwkSource);
   }
 
-  /*
-   * Декодер для JwtService:
-   * проверяет подпись и стандартные ограничения JWT.
-   * JwtService дополнительно проверяет issuer и tokenType.
-   */
   @Bean("jwtTokenDecoder")
   public JwtDecoder jwtTokenDecoder(RSAPublicKey publicKey) {
     return NimbusJwtDecoder.withPublicKey(publicKey).build();
   }
 
-  /*
-   * Декодер для Spring Security:
-   * разрешает только access-токены с корректным issuer.
-   */
   @Bean("jwtDecoder")
   @Primary
   public JwtDecoder jwtDecoder(
