@@ -1,0 +1,10 @@
+app:
+  internal-api:
+    key: test-internal-api-key
+
+  jwt:
+    issuer: https://auth.example.com
+    private-key-location: classpath:keys/private.pem
+    public-key-location: classpath:keys/public.pem
+    access-token-minutes: 15
+    refresh-token-days: 7

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -37,6 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@ActiveProfiles("test")
 @SpringBootTest(properties = {
     "app.internal-api.key=test-internal-api-key",
     "app.jwt.issuer=authentication-service-test",
@@ -69,8 +71,15 @@ class AuthControllerIntegrationTest {
         pem("PRIVATE KEY", pair.getPrivate().getEncoded())
     );
 
-    registry.add("app.jwt.public-key-location", publicKeyPath::toString);
-    registry.add("app.jwt.private-key-location", privateKeyPath::toString);
+    registry.add(
+        "app.jwt.public-key-location",
+        () -> publicKeyPath.toUri().toString()
+    );
+
+    registry.add(
+        "app.jwt.private-key-location",
+        () -> privateKeyPath.toUri().toString()
+    );
   }
 
   @Autowired
@@ -208,7 +217,6 @@ class AuthControllerIntegrationTest {
         jwtService.hashToken(newRefresh)
     )).isPresent();
 
-    // Повторное использование старого refresh-токена запрещено.
     mockMvc.perform(post("/api/auth/refresh")
             .contentType(MediaType.APPLICATION_JSON)
             .content(refreshJson(oldRefresh)))
@@ -219,7 +227,6 @@ class AuthControllerIntegrationTest {
   void validateAcceptsAccessTokenAndRejectsRefreshToken() throws Exception {
     JsonNode tokens = loginAndReadTokens(login, password);
 
-    // Access-токен должен пройти проверку.
     mockMvc.perform(post("/api/auth/validate")
             .contentType(MediaType.APPLICATION_JSON)
             .content(tokenJson(tokens.get("accessToken").asText())))
@@ -229,7 +236,6 @@ class AuthControllerIntegrationTest {
         .andExpect(jsonPath("$.userId").value(Long.toString(userId)))
         .andExpect(jsonPath("$.role").value("USER"));
 
-    // Refresh-токен не должен приниматься как access-токен.
     mockMvc.perform(post("/api/auth/validate")
             .contentType(MediaType.APPLICATION_JSON)
             .content(tokenJson(tokens.get("refreshToken").asText())))
