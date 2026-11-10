@@ -115,11 +115,27 @@ class UserRoleAuthorizationIntegrationTest extends AbstractIntegrationTest {
   }
 
   @Test
-  void userCannotSearchUserByEmail() throws Exception {
+  void userCanSearchOwnProfileByEmail() throws Exception {
+    mockMvc.perform(get("/api/users/by-email")
+            .param("email", user1.getEmail())
+            .with(userJwt(user1.getId())))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void userCannotSearchAnotherUsersProfileByEmail() throws Exception {
     mockMvc.perform(get("/api/users/by-email")
             .param("email", user2.getEmail())
             .with(userJwt(user1.getId())))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void adminCanSearchAnotherUsersProfileByEmail() throws Exception {
+    mockMvc.perform(get("/api/users/by-email")
+            .param("email", user2.getEmail())
+            .with(adminJwt()))
+        .andExpect(status().isOk());
   }
 
   @Test
