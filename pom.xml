@@ -14,5 +14,6 @@
     <modules>
         <module>authentification_service</module>
         <module>user_service</module>
+        <module>order_service</module>
     </modules>
 </project>
