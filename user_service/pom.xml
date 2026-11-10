@@ -8,7 +8,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -33,7 +33,6 @@
         <mapstruct.version>1.6.3</mapstruct.version>
     </properties>
 
-    <!-- Единое управление версиями исправленных транзитивных зависимостей -->
     <dependencyManagement>
         <dependencies>
 
@@ -90,19 +89,17 @@
 
     <dependencies>
 
-        <!-- Основные зависимости приложения -->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <!-- Кэширование -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
 
-        <!-- Redis -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
@@ -161,15 +158,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- MapStruct -->
-
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
             <version>${mapstruct.version}</version>
         </dependency>
-
-        <!-- PostgreSQL JDBC -->
 
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -177,15 +170,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Lombok -->
-
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-
-        <!-- Тестирование Spring Boot -->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -222,8 +211,6 @@
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
-
-        <!-- Testcontainers: JUnit 5 + PostgreSQL -->
 
         <dependency>
             <groupId>org.testcontainers</groupId>

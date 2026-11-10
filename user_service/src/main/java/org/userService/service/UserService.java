@@ -58,10 +58,7 @@ public class UserService {
     return userMapper.toResponse(savedUser);
   }
 
-  /**
-   * Creates the user profile and stores login/password in Auth Service.
-   * The password is never persisted by User Service.
-   */
+
   @Transactional
   public UserResponse register(UserRegistrationRequest request) {
     String email = EmailNormalizer.normalize(request.email());
@@ -78,8 +75,6 @@ public class UserService {
 
     User savedUser = userRepository.saveAndFlush(user);
 
-    // Any client error is a RuntimeException and rolls back the User DB transaction.
-    // Auth Service stores only a BCrypt hash of the password.
     authCredentialsClient.createCredentials(
         savedUser.getId(), email, request.password()
     );
@@ -222,6 +217,29 @@ public class UserService {
 
     return "**** **** **** " +
         digits.substring(digits.length() - 4);
+  }
+
+  @Transactional(readOnly = true)
+  public java.util.List<UserResponse> getByIds(
+      java.util.List<Long> userIds
+  ) {
+
+    java.util.List<Long> distinctIds = userIds.stream()
+        .distinct()
+        .toList();
+
+    java.util.List<User> users =
+        userRepository.findAllById(distinctIds);
+
+    if (users.size() != distinctIds.size()) {
+      throw new ResourceNotFoundException(
+          "One or more users were not found"
+      );
+    }
+
+    return users.stream()
+        .map(userMapper::toResponse)
+        .toList();
   }
 
 }

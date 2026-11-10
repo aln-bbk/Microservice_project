@@ -15,6 +15,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.userService.dto.user.UserIdsRequest;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -47,9 +49,9 @@ public class UserController {
   @GetMapping("/{id}")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.isCurrentUser(#p0, authentication)"
+          "@resourceAuthorization.isCurrentUser(#id, authentication)"
   )
-  public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
+  public ResponseEntity<UserResponse> getById(@PathVariable("id") Long id) {
     return ResponseEntity.ok(userService.getById(id));
   }
 
@@ -71,10 +73,10 @@ public class UserController {
   @PutMapping("/{id}")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.isCurrentUser(#p0, authentication)"
+          "@resourceAuthorization.isCurrentUser(#id, authentication)"
   )
   public ResponseEntity<UserResponse> update(
-      @PathVariable Long id,
+      @PathVariable("id") Long id,
       @Valid @RequestBody UserUpdateRequest request
   ) {
     return ResponseEntity.ok(userService.update(id, request));
@@ -82,19 +84,19 @@ public class UserController {
 
   @PatchMapping("/{id}/activate")
   @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<UserResponse> activate(@PathVariable Long id) {
+  public ResponseEntity<UserResponse> activate(@PathVariable("id") Long id) {
     return ResponseEntity.ok(userService.activate(id));
   }
 
   @PatchMapping("/{id}/deactivate")
   @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<UserResponse> deactivate(@PathVariable Long id) {
+  public ResponseEntity<UserResponse> deactivate(@PathVariable("id") Long id) {
     return ResponseEntity.ok(userService.deactivate(id));
   }
 
   @DeleteMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<Void> delete(@PathVariable Long id) {
+  public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
     userService.delete(id);
     return ResponseEntity.noContent().build();
   }
@@ -102,10 +104,10 @@ public class UserController {
   @GetMapping("/{id}/with-cards")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.isCurrentUser(#p0, authentication)"
+          "@resourceAuthorization.isCurrentUser(#id, authentication)"
   )
   public ResponseEntity<UserWithCardsResponse> getWithCards(
-      @PathVariable Long id
+      @PathVariable("id") Long id
   ) {
     return ResponseEntity.ok(userService.getWithCards(id));
   }
@@ -125,9 +127,23 @@ public class UserController {
   }
 
   @GetMapping("/by-email")
-  @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<UserResponse> getByEmail(@RequestParam String email) {
+  @PreAuthorize("hasRole('ADMIN') or " +
+      "@resourceAuthorization.isCurrentUserEmail(#email, authentication)")
+  public ResponseEntity<UserResponse> getByEmail(@RequestParam("email") String email) {
     return ResponseEntity.ok(userService.getByEmail(email));
+  }
+
+  @PostMapping("/by-ids")
+  @PreAuthorize(
+      "hasRole('ADMIN') or " +
+          "@resourceAuthorization.areCurrentUsers(#request.userIds, authentication)"
+  )
+  public ResponseEntity<List<UserResponse>> getByIds(
+      @Valid @RequestBody UserIdsRequest request
+  ) {
+    return ResponseEntity.ok(
+        userService.getByIds(request.userIds())
+    );
   }
 
 }

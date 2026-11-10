@@ -30,7 +30,7 @@ public class PaymentCardController {
   @PostMapping
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.isCurrentUser(#p0.userId, authentication)"
+          "@resourceAuthorization.isCurrentUser(#request.userId(), authentication)"
   )
   public ResponseEntity<PaymentCardResponse> create(
       @Valid @RequestBody PaymentCardCreateRequest request
@@ -42,7 +42,7 @@ public class PaymentCardController {
   @GetMapping("/{id}")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.ownsCard(#p0, authentication)"
+          "@resourceAuthorization.ownsCard(#id, authentication)"
   )
   public ResponseEntity<PaymentCardResponse> getById(@PathVariable Long id) {
     return ResponseEntity.ok(cardService.getById(id));
@@ -62,7 +62,7 @@ public class PaymentCardController {
   @GetMapping("/user/{userId}")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.isCurrentUser(#p0, authentication)"
+          "@resourceAuthorization.isCurrentUser(#userId, authentication)"
   )
   public ResponseEntity<List<PaymentCardResponse>> getByUserId(@PathVariable Long userId) {
     return ResponseEntity.ok(cardService.getByUserId(userId));
@@ -71,7 +71,7 @@ public class PaymentCardController {
   @PutMapping("/{id}")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.ownsCard(#p0, authentication)"
+          "@resourceAuthorization.ownsCard(#id, authentication)"
   )
   public ResponseEntity<PaymentCardResponse> update(
       @PathVariable Long id,
@@ -83,7 +83,7 @@ public class PaymentCardController {
   @PatchMapping("/{id}/activate")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.ownsCard(#p0, authentication)"
+          "@resourceAuthorization.ownsCard(#id, authentication)"
   )
   public ResponseEntity<PaymentCardResponse> activate(@PathVariable Long id) {
     return ResponseEntity.ok(cardService.activate(id));
@@ -92,7 +92,7 @@ public class PaymentCardController {
   @PatchMapping("/{id}/deactivate")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.ownsCard(#p0, authentication)"
+          "@resourceAuthorization.ownsCard(#id, authentication)"
   )
   public ResponseEntity<PaymentCardResponse> deactivate(@PathVariable Long id) {
     return ResponseEntity.ok(cardService.deactivate(id));
@@ -101,7 +101,7 @@ public class PaymentCardController {
   @DeleteMapping("/{id}")
   @PreAuthorize(
       "hasRole('ADMIN') or " +
-          "@resourceAuthorization.ownsCard(#p0, authentication)"
+          "@resourceAuthorization.ownsCard(#id, authentication)"
   )
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     cardService.delete(id);

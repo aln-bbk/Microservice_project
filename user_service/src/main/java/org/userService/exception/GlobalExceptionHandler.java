@@ -1,6 +1,7 @@
 package org.userService.exception;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -71,6 +72,17 @@ public class GlobalExceptionHandler {
     return error(
         HttpStatus.CONFLICT,
         "The request violates a database constraint"
+    );
+  }
+
+
+  @ExceptionHandler(AccessDeniedException.class)
+  public ResponseEntity<Map<String, Object>> handleAccessDenied(
+      AccessDeniedException ex
+  ) {
+    return error(
+        HttpStatus.FORBIDDEN,
+        "You do not have permission to perform this action"
     );
   }
 
