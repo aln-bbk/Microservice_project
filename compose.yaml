@@ -29,6 +29,22 @@ services:
       timeout: 3s
       retries: 10
 
+  order-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${ORDER_DB_NAME:-order_service}
+      POSTGRES_USER: ${ORDER_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:?Set ORDER_DB_PASSWORD in .env}
+    ports:
+      - "5434:5432"
+    volumes:
+      - order_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     ports:
@@ -41,10 +57,9 @@ services:
 
   auth-app:
     build:
-      context: ../authentification_service
+      context: ./authentification_service
       dockerfile: Dockerfile
     environment:
-      SPRING_PROFILES_ACTIVE: docker
       AUTH_DB_URL: jdbc:postgresql://auth-postgres:5432/auth_service
       AUTH_DB_USERNAME: ${AUTH_DB_USERNAME:-postgres}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in .env}
@@ -52,13 +67,13 @@ services:
       JWT_PRIVATE_KEY_PATH: /run/keys/private.pem
       JWT_PUBLIC_KEY_PATH: /run/keys/public.pem
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
-      BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-true}
-      BOOTSTRAP_ADMIN_LOGIN: ${BOOTSTRAP_ADMIN_LOGIN:-admin}
-      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Set BOOTSTRAP_ADMIN_PASSWORD in .env}
-      BOOTSTRAP_ADMIN_USER_ID: ${BOOTSTRAP_ADMIN_USER_ID:-900000000}
+      BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-false}
+      BOOTSTRAP_ADMIN_LOGIN: ${BOOTSTRAP_ADMIN_LOGIN:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BOOTSTRAP_ADMIN_USER_ID: ${BOOTSTRAP_ADMIN_USER_ID:-}
     volumes:
-      - ../authentification_service/private.pem:/run/keys/private.pem:ro
-      - ../authentification_service/public.pem:/run/keys/public.pem:ro
+      - ./secrets/private.pem:/run/keys/private.pem:ro
+      - ./secrets/public.pem:/run/keys/public.pem:ro
     ports:
       - "8081:8081"
     healthcheck:
@@ -73,7 +88,7 @@ services:
 
   app:
     build:
-      context: .
+      context: ./user_service
       dockerfile: Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
@@ -87,7 +102,7 @@ services:
       AUTH_SERVICE_BASE_URL: http://auth-app:8081
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
     volumes:
-      - ../authentification_service/public.pem:/run/keys/public.pem:ro
+      - ./secrets/public.pem:/run/keys/public.pem:ro
     ports:
       - "8080:8080"
     depends_on:
@@ -98,6 +113,31 @@ services:
       auth-app:
         condition: service_healthy
 
+  order-app:
+    build:
+      context: ./order_service
+      dockerfile: Dockerfile
+    environment:
+      ORDER_DB_URL: jdbc:postgresql://order-postgres:5432/${ORDER_DB_NAME:-order_service}
+      ORDER_DB_USERNAME: ${ORDER_DB_USERNAME:-postgres}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?Set ORDER_DB_PASSWORD in .env}
+      ORDER_SERVICE_PORT: 8082
+      USER_SERVICE_URL: http://app:8080
+      JWT_ISSUER: ${JWT_ISSUER:-https://auth.example.com}
+      JWT_PUBLIC_KEY_LOCATION: file:/run/keys/public.pem
+    volumes:
+      - ./secrets/public.pem:/run/keys/public.pem:ro
+    ports:
+      - "8082:8082"
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+      app:
+        condition: service_started
+      auth-app:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   auth_postgres_data:
+  order_postgres_data:
