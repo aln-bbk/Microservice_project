@@ -217,8 +217,7 @@ class AuthControllerIntegrationTest {
   @Test
   void validateAcceptsAccessTokenAndRejectsRefreshToken() throws Exception {
     JsonNode tokens = loginAndReadTokens(login, password);
-
-    // Access-токен должен пройти проверку.
+    
     mockMvc.perform(post("/api/auth/validate")
             .contentType(MediaType.APPLICATION_JSON)
             .content(tokenJson(tokens.get("accessToken").asText())))
@@ -227,7 +226,7 @@ class AuthControllerIntegrationTest {
         .andExpect(jsonPath("$.tokenType").value("access"))
         .andExpect(jsonPath("$.userId").value(Long.toString(userId)))
         .andExpect(jsonPath("$.role").value("USER"));
-    
+
     mockMvc.perform(post("/api/auth/validate")
             .contentType(MediaType.APPLICATION_JSON)
             .content(tokenJson(tokens.get("refreshToken").asText())))
