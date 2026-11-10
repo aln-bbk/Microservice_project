@@ -80,6 +80,7 @@ public class JwtService {
         .id(UUID.randomUUID().toString())
         .claim("userId", credential.getUserId())
         .claim("role", credential.getRole().name())
+        .claim("email", credential.getLogin())
         .claim("tokenType", tokenType)
         .build();
 

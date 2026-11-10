@@ -5,7 +5,7 @@
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.1.2</version>
         <relativePath/>
-        <!--  lookup parent from repository  -->
+
     </parent>
     <groupId>org.course_project</groupId>
     <artifactId>authentication_service</artifactId>

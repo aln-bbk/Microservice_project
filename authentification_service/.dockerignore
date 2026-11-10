@@ -2,5 +2,5 @@
 .idea
 target
 .env
-private.pem
+src/main/resources/keys/private.pem
 secrets/

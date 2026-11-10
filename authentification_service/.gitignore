@@ -33,7 +33,7 @@ build/
 .vscode/
 
 ### Keys ###
-private.pem
+src/main/resources/keys/private.pem
 .env
 
 secrets/

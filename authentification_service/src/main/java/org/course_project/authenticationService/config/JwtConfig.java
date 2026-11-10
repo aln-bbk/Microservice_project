@@ -9,6 +9,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.security.converter.RsaKeyConverters;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -20,8 +23,6 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.interfaces.RSAPrivateKey;
@@ -29,25 +30,40 @@ import java.security.interfaces.RSAPublicKey;
 
 @Configuration
 public class JwtConfig {
-
   @Bean
   public RSAPublicKey rsaPublicKey(
-      @Value("${app.jwt.public-key-location}") String location
+      @Value("${app.jwt.public-key-location}") String location,
+      ResourceLoader resourceLoader
   ) throws IOException {
-    try (InputStream input = Files.newInputStream(Path.of(location))) {
+    Resource resource = resolveResource(location, resourceLoader);
+
+    try (InputStream input = resource.getInputStream()) {
       return RsaKeyConverters.x509().convert(input);
     }
   }
 
   @Bean
   public RSAPrivateKey rsaPrivateKey(
-      @Value("${app.jwt.private-key-location}") String location
+      @Value("${app.jwt.private-key-location}") String location,
+      ResourceLoader resourceLoader
   ) throws IOException {
-    try (InputStream input = Files.newInputStream(Path.of(location))) {
+    Resource resource = resolveResource(location, resourceLoader);
+
+    try (InputStream input = resource.getInputStream()) {
       return RsaKeyConverters.pkcs8().convert(input);
     }
   }
 
+  private Resource resolveResource(
+      String location,
+      ResourceLoader resourceLoader
+  ) {
+    if (location.startsWith("classpath:") || location.startsWith("file:")) {
+      return resourceLoader.getResource(location);
+    }
+
+    return new FileSystemResource(location);
+  }
   @Bean
   public JwtEncoder jwtEncoder(
       RSAPublicKey publicKey,
@@ -64,20 +80,11 @@ public class JwtConfig {
     return new NimbusJwtEncoder(jwkSource);
   }
 
-  /*
-   * Декодер для JwtService:
-   * проверяет подпись и стандартные ограничения JWT.
-   * JwtService дополнительно проверяет issuer и tokenType.
-   */
   @Bean("jwtTokenDecoder")
   public JwtDecoder jwtTokenDecoder(RSAPublicKey publicKey) {
     return NimbusJwtDecoder.withPublicKey(publicKey).build();
   }
 
-  /*
-   * Декодер для Spring Security:
-   * разрешает только access-токены с корректным issuer.
-   */
   @Bean("jwtDecoder")
   @Primary
   public JwtDecoder jwtDecoder(

@@ -43,6 +43,6 @@ app:
   jwt:
     issuer: ${JWT_ISSUER:https://auth.example.com}
     private-key-location: ${JWT_PRIVATE_KEY_PATH}
-    public-key-location: ${JWT_PUBLIC_KEY_PATH:public.pem}
+    public-key-location: ${JWT_PUBLIC_KEY_PATH:classpath:keys/public.pem}
     access-token-minutes: 15
     refresh-token-days: 7
