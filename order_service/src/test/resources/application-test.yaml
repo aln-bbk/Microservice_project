@@ -1,0 +1,32 @@
+app:
+  internal-api:
+    key: test-internal-api-key
+
+  jwt:
+    issuer: https://auth.example.com
+    public-key-location: classpath:keys/public.pem
+    access-token-minutes: 15
+    refresh-token-days: 7
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  liquibase:
+    enabled: true
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+user-service:
+  url: http://localhost:8089
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+
