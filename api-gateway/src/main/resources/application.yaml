@@ -1,0 +1,34 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: authentication-service
+              uri: ${AUTH_SERVICE_URL:http://auth-app:8081}
+              predicates:
+                - Path=/api/auth/**
+            - id: user-service
+              uri: ${USER_SERVICE_URL:http://app:8080}
+              predicates:
+                - Path=/api/users/**,/api/cards/**
+            - id: order-service
+              uri: ${ORDER_SERVICE_URL:http://order-app:8082}
+              predicates:
+                - Path=/api/orders/**,/api/items/**
+
+app:
+  jwt:
+    public-key-location: ${JWT_PUBLIC_KEY_LOCATION:classpath:keys/public.pem}
+    issuer: ${JWT_ISSUER:auth-service}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
