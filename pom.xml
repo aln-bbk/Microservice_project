@@ -12,8 +12,9 @@
     <description>Independent User and Authentication Spring Boot services</description>
 
     <modules>
-        <module>authentification_service</module>
-        <module>user_service</module>
-        <module>order_service</module>
+        <module>authentification-service</module>
+        <module>user-service</module>
+        <module>order-service</module>
+        <module>api-gateway</module>
     </modules>
 </project>
