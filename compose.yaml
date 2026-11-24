@@ -1,72 +1,100 @@
 services:
+  # =========================
+  # DATABASES
+  # =========================
+
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-user_service_db}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 10s
 
   auth-postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: auth_service
       POSTGRES_USER: ${AUTH_DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in .env}
     volumes:
       - auth_postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 10s
 
   order-postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${ORDER_DB_NAME:-order_service}
       POSTGRES_USER: ${ORDER_DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:?Set ORDER_DB_PASSWORD in .env}
-    ports:
-      - "5434:5432"
     volumes:
       - order_postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 10s
+
+  # =========================
+  # REDIS
+  # =========================
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD", "redis-cli", "PING"]
       interval: 5s
       timeout: 3s
       retries: 10
 
+  # =========================
+  # AUTHENTICATION SERVICE
+  # =========================
+
   auth-app:
     build:
-      context: ./authentification_service
+      context: ./authentification-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       AUTH_DB_URL: jdbc:postgresql://auth-postgres:5432/auth_service
       AUTH_DB_USERNAME: ${AUTH_DB_USERNAME:-postgres}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in .env}
+
       JWT_ISSUER: ${JWT_ISSUER:-https://auth.example.com}
       JWT_PRIVATE_KEY_PATH: /run/keys/private.pem
       JWT_PUBLIC_KEY_PATH: /run/keys/public.pem
+
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
+
       BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-false}
       BOOTSTRAP_ADMIN_LOGIN: ${BOOTSTRAP_ADMIN_LOGIN:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
@@ -74,37 +102,46 @@ services:
     volumes:
       - ./secrets/private.pem:/run/keys/private.pem:ro
       - ./secrets/public.pem:/run/keys/public.pem:ro
-    ports:
-      - "8081:8081"
+    networks:
+      - backend
+    depends_on:
+      auth-postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8081/actuator/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
-    depends_on:
-      auth-postgres:
-        condition: service_healthy
+
+  # =========================
+  # USER SERVICE
+  # =========================
 
   app:
     build:
-      context: ./user_service
+      context: ./user-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: docker
+
       DB_URL: ${DB_URL_DOCKER:-jdbc:postgresql://postgres:5432/user_service_db}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+
       REDIS_HOST: redis
       REDIS_PORT: 6379
+
       JWT_ISSUER: ${JWT_ISSUER:-https://auth.example.com}
       JWT_PUBLIC_KEY_LOCATION: file:/run/keys/public.pem
+
       AUTH_SERVICE_BASE_URL: http://auth-app:8081
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
     volumes:
       - ./secrets/public.pem:/run/keys/public.pem:ro
-    ports:
-      - "8080:8080"
+    networks:
+      - backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,32 +149,102 @@ services:
         condition: service_healthy
       auth-app:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # =========================
+  # ORDER SERVICE
+  # =========================
 
   order-app:
     build:
-      context: ./order_service
+      context: ./order-service
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       ORDER_DB_URL: jdbc:postgresql://order-postgres:5432/${ORDER_DB_NAME:-order_service}
       ORDER_DB_USERNAME: ${ORDER_DB_USERNAME:-postgres}
       ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?Set ORDER_DB_PASSWORD in .env}
+
       ORDER_SERVICE_PORT: 8082
       USER_SERVICE_URL: http://app:8080
+
+      JWT_ISSUER: ${JWT_ISSUER:-https://auth.example.com}
+      JWT_PUBLIC_KEY_LOCATION: file:/run/keys/public.pem
+    volumes:
+      - ./secrets/public.pem:/run/keys/public.pem:ro
+    networks:
+      - backend
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+      auth-app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # =========================
+  # API GATEWAY
+  # =========================
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8080
+
+      AUTH_SERVICE_URL: http://auth-app:8081
+      USER_SERVICE_URL: http://app:8080
+      ORDER_SERVICE_URL: http://order-app:8082
+
       JWT_ISSUER: ${JWT_ISSUER:-https://auth.example.com}
       JWT_PUBLIC_KEY_LOCATION: file:/run/keys/public.pem
     volumes:
       - ./secrets/public.pem:/run/keys/public.pem:ro
     ports:
-      - "8082:8082"
+      - "8080:8080"
+    networks:
+      - backend
     depends_on:
-      order-postgres:
-        condition: service_healthy
-      app:
-        condition: service_started
       auth-app:
         condition: service_healthy
+      app:
+        condition: service_healthy
+      order-app:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "status=$$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:8080/); test \"$$status\" = \"401\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+# =========================
+# NETWORKS AND VOLUMES
+# =========================
+
+networks:
+  backend:
+    driver: bridge
 
 volumes:
   postgres_data:
   auth_postgres_data:
   order_postgres_data:
+  redis_data:
