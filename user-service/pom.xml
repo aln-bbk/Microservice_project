@@ -13,7 +13,7 @@
     </parent>
 
     <groupId>org.preintership_tasks</groupId>
-    <artifactId>course_project</artifactId>
+    <artifactId>user-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>course_project</name>
     <description>course_project</description>

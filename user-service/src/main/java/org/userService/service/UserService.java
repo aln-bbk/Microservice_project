@@ -15,12 +15,18 @@ import org.userService.specification.UserSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.userService.dto.user.UserWithCardsResponse;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.userService.dto.user.UserRegistrationRequest;
 import org.userService.integration.AuthCredentialsClient;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class UserService {
@@ -29,6 +35,7 @@ public class UserService {
   private final UserMapper userMapper;
   private final PaymentCardService paymentCardService;
   private final AuthCredentialsClient authCredentialsClient;
+  private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
   public UserService(
       UserRepository userRepository,
@@ -75,11 +82,85 @@ public class UserService {
 
     User savedUser = userRepository.saveAndFlush(user);
 
+    Long createdUserId = savedUser.getId();
+
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      throw new IllegalStateException(
+          "Transaction synchronization is not active"
+      );
+    }
+
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+
+          @Override
+          public void afterCompletion(int status) {
+
+            if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+
+              compensateCredentialsWithRetry(createdUserId);
+            }
+          }
+        }
+    );
+
     authCredentialsClient.createCredentials(
-        savedUser.getId(), email, request.password()
+        createdUserId,
+        email,
+        request.password()
     );
 
     return userMapper.toResponse(savedUser);
+  }
+
+  private void compensateCredentialsWithRetry(Long userId) {
+    final int maxAttempts = 3;
+    final long initialDelayMillis = 500L;
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        authCredentialsClient.deleteCredentials(userId);
+        log.info(
+            "Successfully compensated credentials for user {} on attempt {}",
+            userId,
+            attempt
+        );
+        return;
+      } catch (RuntimeException exception) {
+        if (attempt == maxAttempts) {
+          log.error(
+              "Failed to compensate credentials for user {} after {} attempts. "
+                  + "Manual reconciliation may be required.",
+              userId,
+              maxAttempts,
+              exception
+          );
+          return;
+        }
+
+        long delayMillis = initialDelayMillis * (1L << (attempt - 1));
+        log.warn(
+            "Compensation attempt {} of {} failed for user {}. Retrying in {} ms",
+            attempt,
+            maxAttempts,
+            userId,
+            delayMillis,
+            exception
+        );
+
+        try {
+          Thread.sleep(delayMillis);
+        } catch (InterruptedException interruptedException) {
+          Thread.currentThread().interrupt();
+          log.error(
+              "Interrupted while retrying credential compensation for user {}",
+              userId,
+              interruptedException
+          );
+          return;
+        }
+      }
+    }
   }
 
   @Transactional(readOnly = true)

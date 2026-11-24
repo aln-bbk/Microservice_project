@@ -44,4 +44,25 @@ public class AuthCredentialsClient {
   }
 
   private record CreateCredentialsPayload(Long userId, String login, String password) {}
+
+  public void deleteCredentials(Long userId) {
+
+    if (internalApiKey == null || internalApiKey.isBlank()) {
+      throw new IllegalStateException(
+          "Internal API key is not configured"
+      );
+    }
+
+    restClient.delete()
+        .uri("/internal/credentials/{userId}", userId)
+        .header("X-Internal-Api-Key", internalApiKey)
+        .retrieve()
+        .onStatus(HttpStatusCode::isError, (request, response) -> {
+          throw new AuthServiceIntegrationException(
+              "Auth Service compensation failed with HTTP "
+                  + response.getStatusCode().value()
+          );
+        })
+        .toBodilessEntity();
+  }
 }

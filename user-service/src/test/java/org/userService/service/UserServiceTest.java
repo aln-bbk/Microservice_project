@@ -6,14 +6,14 @@ import org.userService.exception.ResourceNotFoundException;
 import org.userService.dto.user.UserCreateRequest;
 import org.userService.dto.user.UserResponse;
 import org.userService.dto.user.UserUpdateRequest;
+import org.userService.dto.user.UserRegistrationRequest;
+import org.userService.integration.AuthCredentialsClient;
 import org.userService.entity.User;
 import org.userService.mapper.UserMapper;
 import org.userService.repository.UserRepository;
 import org.userService.dto.user.UserWithCardsResponse;
 import org.userService.dto.card.PaymentCardResponse;
 
-import org.userService.service.PaymentCardService;
-import org.userService.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -29,10 +29,24 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -46,8 +60,119 @@ class UserServiceTest {
   @Mock
   private PaymentCardService paymentCardService;
 
+  @Mock
+  private AuthCredentialsClient authCredentialsClient;
+
   @InjectMocks
   private UserService userService;
+
+
+  @Test
+  void register_shouldCompensateAuthCredentials_whenUserTransactionRollsBack() {
+    UserRegistrationRequest request = new UserRegistrationRequest(
+        "Anna", "Ivanova", LocalDate.of(2000, 1, 1),
+        "anna@example.com", "a-very-strong-password"
+    );
+    UserResponse expected = new UserResponse(
+        42L, "Anna", "Ivanova", LocalDate.of(2000, 1, 1),
+        "anna@example.com", true, null, null
+    );
+
+    when(userRepository.existsByEmail("anna@example.com")).thenReturn(false);
+    when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
+      User saved = invocation.getArgument(0);
+      saved.setId(42L);
+      return saved;
+    });
+    when(userMapper.toResponse(any(User.class))).thenReturn(expected);
+
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      assertEquals(expected, userService.register(request));
+      verify(authCredentialsClient).createCredentials(
+          42L, "anna@example.com", "a-very-strong-password"
+      );
+
+      for (TransactionSynchronization synchronization
+          : TransactionSynchronizationManager.getSynchronizations()) {
+        synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+      }
+
+      verify(authCredentialsClient).deleteCredentials(42L);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+  }
+
+  @Test
+  void register_shouldRetryCredentialCompensation_whenFirstDeleteAttemptFails() {
+    UserRegistrationRequest request = new UserRegistrationRequest(
+        "Anna", "Ivanova", LocalDate.of(2000, 1, 1),
+        "anna@example.com", "a-very-strong-password"
+    );
+    UserResponse expected = new UserResponse(
+        42L, "Anna", "Ivanova", LocalDate.of(2000, 1, 1),
+        "anna@example.com", true, null, null
+    );
+
+    when(userRepository.existsByEmail("anna@example.com")).thenReturn(false);
+    when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
+      User saved = invocation.getArgument(0);
+      saved.setId(42L);
+      return saved;
+    });
+    when(userMapper.toResponse(any(User.class))).thenReturn(expected);
+
+    doThrow(new RuntimeException("Auth Service temporarily unavailable"))
+        .doNothing()
+        .when(authCredentialsClient).deleteCredentials(42L);
+
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      userService.register(request);
+
+      for (TransactionSynchronization synchronization
+          : TransactionSynchronizationManager.getSynchronizations()) {
+        synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+      }
+
+      verify(authCredentialsClient, times(2)).deleteCredentials(42L);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+  }
+
+  @Test
+  void register_shouldNotCompensateAuthCredentials_whenUserTransactionCommits() {
+    UserRegistrationRequest request = new UserRegistrationRequest(
+        "Anna", "Ivanova", LocalDate.of(2000, 1, 1),
+        "anna@example.com", "a-very-strong-password"
+    );
+    UserResponse expected = new UserResponse(
+        43L, "Anna", "Ivanova", LocalDate.of(2000, 1, 1),
+        "anna@example.com", true, null, null
+    );
+
+    when(userRepository.existsByEmail("anna@example.com")).thenReturn(false);
+    when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
+      User saved = invocation.getArgument(0);
+      saved.setId(43L);
+      return saved;
+    });
+    when(userMapper.toResponse(any(User.class))).thenReturn(expected);
+
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      userService.register(request);
+      for (TransactionSynchronization synchronization
+          : TransactionSynchronizationManager.getSynchronizations()) {
+        synchronization.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+      }
+      verify(authCredentialsClient, never()).deleteCredentials(anyLong());
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+  }
 
   // ---------- CREATE ----------
 
@@ -464,11 +589,13 @@ class UserServiceTest {
       String email
   ) {
     User user = new User();
+
     user.setId(id);
     user.setName(name);
     user.setSurname(surname);
     user.setEmail(email);
     user.setActive(true);
+
     return user;
   }
 
